@@ -2,3 +2,4 @@
 __pycache__/
 *.py[cod]
 .venv_alice/
+alice_output/

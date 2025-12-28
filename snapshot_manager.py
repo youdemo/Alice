@@ -8,8 +8,6 @@ class SnapshotManager:
     """
     def __init__(self, core_paths=None):
         self.core_paths = core_paths or [
-            "memory/alice_memory.md",
-            "memory/todo.md",
             "prompts/alice.md",
             "skills"
         ]
