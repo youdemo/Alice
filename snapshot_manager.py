@@ -1,0 +1,69 @@
+import os
+import time
+
+class SnapshotManager:
+    """
+    Alice 的快照索引管理器
+    负责扫描核心文件并生成内存快照摘要，以节省上下文空间。
+    """
+    def __init__(self, core_paths=None):
+        self.core_paths = core_paths or [
+            "memory/alice_memory.md",
+            "memory/todo.md",
+            "prompts/alice.md",
+            "skills"
+        ]
+        self.snapshots = {}
+        self.refresh()
+
+    def _get_summary(self, path):
+        """生成极简摘要：文件名、大小、最后修改时间、以及前两行内容"""
+        if not os.path.exists(path):
+            return None
+        
+        try:
+            mtime = time.ctime(os.path.getmtime(path))
+            size = os.path.getsize(path)
+            
+            summary = f"[文件: {path}, 大小: {size} bytes, 修改时间: {mtime}]"
+            
+            if os.path.isfile(path) and path.endswith(".md"):
+                with open(path, 'r', encoding='utf-8', errors='ignore') as f:
+                    lines = [f.readline().strip() for _ in range(2)]
+                    first_content = " | ".join([l for l in lines if l])
+                    if first_content:
+                        summary += f" 预览: {first_content}..."
+            elif os.path.isdir(path):
+                items = os.listdir(path)
+                summary += f" 包含项: {', '.join(items[:5])}{'...' if len(items) > 5 else ''}"
+                
+            return summary
+        except Exception as e:
+            return f"[路径: {path}, 状态: 无法读取 ({str(e)})]"
+
+    def refresh(self):
+        """刷新所有快照"""
+        new_snapshots = {}
+        for path in self.core_paths:
+            if os.path.isfile(path):
+                new_snapshots[path] = self._get_summary(path)
+            elif os.path.isdir(path):
+                # 记录目录快照，并深入一层记录关键技能
+                new_snapshots[path] = self._get_summary(path)
+                for item in os.listdir(path):
+                    item_path = os.path.join(path, item)
+                    skill_md = os.path.join(item_path, "SKILL.md")
+                    if os.path.exists(skill_md):
+                        new_snapshots[skill_md] = self._get_summary(skill_md)
+        self.snapshots = new_snapshots
+
+    def get_index_text(self):
+        """生成注入上下文的索引文本"""
+        if not self.snapshots:
+            return "暂无快照数据。"
+        
+        lines = ["你目前拥有以下文件/目录的最新内存快照摘要："]
+        for path, summary in self.snapshots.items():
+            lines.append(f"- {summary}")
+        lines.append("\n**提示**：如果你需要获取上述文件的详细内容（例如具体的任务进度、过往记忆或技能用法），请直接调用相应的工具（如 `cat` 或 `file_explorer`）读取全文。快照仅供快速定位参考。")
+        return "\n".join(lines)

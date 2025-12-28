@@ -4,6 +4,7 @@ import os
 import sys
 from openai import OpenAI
 import config
+from snapshot_manager import SnapshotManager
 
 class AliceAgent:
     def __init__(self, model_name=None, prompt_path=None):
@@ -24,18 +25,20 @@ class AliceAgent:
         self.sandbox_venv = ".venv_alice"
         self.sandbox_python = os.path.join(self.sandbox_venv, "bin", "python") if os.name != "nt" else os.path.join(self.sandbox_venv, "Scripts", "python.exe")
         
+        # 内存快照管理器
+        self.snapshot_mgr = SnapshotManager()
+        
         self._refresh_system_message()
 
     def _refresh_system_message(self):
-        """刷新系统消息，注入最新的提示词、长期记忆和任务清单"""
+        """刷新系统消息，注入最新的提示词和文件索引快照"""
         self.system_prompt = self._load_prompt()
-        self.memory_content = self._load_file_content(self.memory_path, "暂无长期记忆。")
-        self.todo_content = self._load_file_content(self.todo_path, "暂无活跃任务。")
+        self.snapshot_mgr.refresh() # 刷新快照
+        self.index_text = self.snapshot_mgr.get_index_text()
         
         full_system_content = (
             f"{self.system_prompt}\n\n"
-            f"### 你的长期记忆 (来自 {self.memory_path})\n{self.memory_content}\n\n"
-            f"### 你的当前任务清单 (来自 {self.todo_path})\n{self.todo_content}"
+            f"### 核心资产索引快照\n{self.index_text}"
         )
         
         if self.messages:
@@ -45,22 +48,13 @@ class AliceAgent:
 
     def _load_prompt(self):
         try:
-            with open(self.prompt_path, 'r', encoding='utf-8') as f:
-                return f.read()
+            if os.path.exists(self.prompt_path):
+                with open(self.prompt_path, 'r', encoding='utf-8') as f:
+                    return f.read()
+            return "你是一个 AI 助手。"
         except Exception as e:
             print(f"加载提示词失败: {e}")
             return "你是一个 AI 助手。"
-
-    def _load_file_content(self, path, default_msg):
-        try:
-            if os.path.exists(path):
-                with open(path, 'r', encoding='utf-8') as f:
-                    content = f.read()
-                    return content if content.strip() else default_msg
-            return default_msg
-        except Exception as e:
-            print(f"加载文件 {path} 失败: {e}")
-            return default_msg
 
     def is_safe_command(self, command):
         danger_keywords = ["rm -rf /", "mkfs", "dd ", "> /dev/"]
@@ -171,10 +165,7 @@ class AliceAgent:
             feedback = "\n\n".join(results)
             self.messages.append({"role": "user", "content": f"沙盒执行反馈：\n{feedback}"})
             
-            # 刷新系统消息（如果记忆或 TODO 文件发生变化）
-            files_to_watch = [self.memory_path, self.todo_path]
-            if any(any(f in cmd for f in files_to_watch) for cmd in bash_commands):
-                self._refresh_system_message()
-                print("[系统]: 记忆或任务清单已更新，重新注入上下文。")
+            # 刷新系统消息（任何子命令执行后都可能改变文件状态，刷新快照）
+            self._refresh_system_message()
                 
-            print(f"\n{'-'*40}\n结果已反馈给 Alice，继续生成中...")
+            print(f"\n{'-'*40}\n系统快照已更新，结果已反馈给 Alice，继续生成中...")
