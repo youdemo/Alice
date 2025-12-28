@@ -245,8 +245,9 @@ class AliceAgent:
                         print(c_chunk, end='', flush=True)
                         full_content += c_chunk
 
-            python_codes = re.findall(r'```python\n(.*?)\n```', full_content, re.DOTALL)
-            bash_commands = re.findall(r'```bash\n(.*?)\n```', full_content, re.DOTALL)
+            # 改进正则：允许 ```bash 后跟可选空格，且对换行符更宽容
+            python_codes = re.findall(r'```python\s*\n?(.*?)\s*```', full_content, re.DOTALL)
+            bash_commands = re.findall(r'```bash\s*\n?(.*?)\s*```', full_content, re.DOTALL)
             
             if not python_codes and not bash_commands:
                 self.messages.append({"role": "assistant", "content": full_content})

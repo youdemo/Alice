@@ -14,8 +14,8 @@ def get_env_var(name, default=None, required=False):
     return value
 
 # API 配置 (强制要求 API_KEY)
-API_KEY = get_env_var("MODELSCOPE_API_KEY", required=True)
-BASE_URL = get_env_var("API_BASE_URL", "https://api-inference.modelscope.cn/v1")
+API_KEY = get_env_var("API_KEY", required=True)
+BASE_URL = get_env_var("API_BASE_URL", "https://apis.iflow.cn/v1")
 
 # 模型配置 (强制要求在 .env 中设置模型名称)
 MODEL_NAME = get_env_var("MODEL_NAME", required=True)
