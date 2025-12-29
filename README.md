@@ -65,15 +65,23 @@ Alice 是一个基于 ReAct 模式的智能体框架，具备分级记忆管理�
 ## 4. 开发与部署工作流
 
 ### 4.1 环境准备
-1. **基础环境**: 确保已安装 Python 3.8+ 及 Docker。
-2. **安装依赖**: 在宿主机安装核心引擎所需的最小依赖：
-   ```bash
-   pip install openai python-dotenv
-   ```
+1. **基础环境**: 确保已安装 Python 3.8+、Node.js 及 Docker。
+2. **安装依赖**: 
+   - **后端**: `pip install openai python-dotenv fastapi uvicorn anyio`
+   - **前端**: `cd alice-ui && npm install`
    *(注：业务相关的复杂依赖如 pandas, matplotlib 等已在 Docker 沙盒中预装)*
 3. **配置文件**: 参考 `.env.example` 创建 `.env` 文件并填入必需参数。
 
-### 4.2 技能扩展流程
+### 4.2 运行方式
+*   **终端模式**: `python main.py`
+*   **UI 模式**:
+    1. 启动后端: `python api_server.py`
+    2. 启动前端: `cd alice-ui && npm run dev`
+    3. 访问: `http://localhost:5173`
+
+### 4.3 技能扩展流程
+>>>>>>>
+
 1. 在 `skills/` 目录下创建子目录。
 2. 编写 `SKILL.md`，包含必需的 `name` 和 `description` 元数据。
 3. 放置可执行代码（Python/Node.js 等）。
