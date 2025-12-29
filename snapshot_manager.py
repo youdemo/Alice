@@ -1,6 +1,8 @@
 import os
 import time
 
+import re
+
 class SnapshotManager:
     """
     Alice 的快照索引管理器
@@ -27,8 +29,18 @@ class SnapshotManager:
             
             if os.path.isfile(path) and path.endswith(".md"):
                 with open(path, 'r', encoding='utf-8', errors='ignore') as f:
-                    lines = [f.readline().strip() for _ in range(2)]
-                    first_content = " | ".join([l for l in lines if l])
+                    content = f.read()
+                
+                # 针对 SKILL.md 提取 description
+                if path.endswith("SKILL.md"):
+                    desc_match = re.search(r'description:\s*(.*)', content)
+                    if desc_match:
+                        summary += f" 功能: {desc_match.group(1).strip()}"
+                    else:
+                        summary += " (未定义描述)"
+                else:
+                    lines = content.splitlines()[:2]
+                    first_content = " | ".join([l.strip() for l in lines if l.strip()])
                     if first_content:
                         summary += f" 预览: {first_content}..."
             elif os.path.isdir(path):

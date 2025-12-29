@@ -166,6 +166,110 @@ class AliceAgent:
             print(f"加载文件 {path} 失败: {e}")
             return default_msg
 
+    def _parse_skill_md(self, path):
+        """解析 SKILL.md 中的 YAML 元数据和正文"""
+        if not os.path.exists(path):
+            return None, None
+        try:
+            with open(path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            match = re.match(r'^---\n(.*?)\n---\n(.*)', content, re.DOTALL)
+            if match:
+                yaml_part = match.group(1)
+                body_part = match.group(2)
+                # 极简解析 YAML
+                metadata = {}
+                for line in yaml_part.split('\n'):
+                    if ':' in line:
+                        k, v = line.split(':', 1)
+                        metadata[k.strip()] = v.strip()
+                return metadata, body_part
+            return {}, content
+        except Exception:
+            return {}, ""
+
+    def handle_toolkit(self, args):
+        """处理内置 toolkit 指令"""
+        if not args or args[0] == "list":
+            skills_dir = os.path.join(self.project_root, "skills")
+            if not os.path.exists(skills_dir):
+                return "未找到 skills 目录。"
+            
+            skill_list = []
+            for item in sorted(os.listdir(skills_dir)):
+                skill_path = os.path.join(skills_dir, item)
+                if os.path.isdir(skill_path):
+                    skill_md = os.path.join(skill_path, "SKILL.md")
+                    meta, _ = self._parse_skill_md(skill_md)
+                    desc = meta.get("description", "无描述") if meta else "未找到 SKILL.md"
+                    skill_list.append(f"- **{item}**: {desc}")
+            return "### 可用技能列表\n" + "\n".join(skill_list)
+
+        elif args[0] == "info" and len(args) > 1:
+            skill_name = args[1]
+            skill_md = os.path.join(self.project_root, "skills", skill_name, "SKILL.md")
+            if not os.path.exists(skill_md):
+                return f"未找到技能 '{skill_name}' 的说明文档。"
+            
+            with open(skill_md, 'r', encoding='utf-8') as f:
+                content = f.read()
+            # 仅返回 YAML 部分以节省上下文
+            match = re.match(r'^(---\n.*?\n---\n)', content, re.DOTALL)
+            if match:
+                return f"### 技能 '{skill_name}' 配置信息\n```yaml\n{match.group(1).strip()}\n```\n*(提示: 如需完整用法，请直接查看 {skill_md})*"
+            return f"技能 '{skill_name}' 的文档格式不规范，无法提取元数据。"
+            
+        return "未知 toolkit 指令。用法: `toolkit list` 或 `toolkit info <skill_name>`"
+
+    def handle_memory(self, content, target="stm"):
+        """处理内置 memory 指令"""
+        now = datetime.now()
+        date_str = now.strftime("%Y-%m-%d")
+        time_str = now.strftime("%H:%M")
+        
+        target_path = self.stm_path if target == "stm" else self.memory_path
+        os.makedirs(os.path.dirname(target_path), exist_ok=True)
+
+        try:
+            if target == "stm":
+                if not os.path.exists(target_path):
+                    with open(target_path, "w", encoding="utf-8") as f:
+                        f.write("# Alice 的短期记忆 (最近 7 天)\n\n")
+                
+                with open(target_path, "r", encoding="utf-8") as f:
+                    lines = f.readlines()
+                
+                has_date_header = any(line.strip() == f"## {date_str}" for line in lines)
+                
+                with open(target_path, "a", encoding="utf-8") as f:
+                    if not has_date_header:
+                        f.write(f"\n## {date_str}\n")
+                    f.write(f"- [{time_str}] {content.strip()}\n")
+                return f"已成功更新短期记忆。"
+            else:
+                # LTM 经验教训追加逻辑
+                if not os.path.exists(target_path):
+                    with open(target_path, "w", encoding="utf-8") as f:
+                        f.write("# Alice 的长期记忆\n")
+
+                with open(target_path, "r", encoding="utf-8") as f:
+                    full_text = f.read()
+
+                lessons_header = "## 经验教训"
+                entry = f"- [{date_str}] {content.strip()}\n"
+
+                if lessons_header in full_text:
+                    parts = full_text.split(lessons_header)
+                    new_content = parts[0] + lessons_header + "\n" + entry + parts[1].lstrip()
+                    with open(target_path, "w", encoding="utf-8") as f:
+                        f.write(new_content)
+                else:
+                    with open(target_path, "a", encoding="utf-8") as f:
+                        f.write(f"\n{lessons_header}\n{entry}")
+                return f"已成功更新长期记忆经验教训。"
+        except Exception as e:
+            return f"更新记忆失败: {str(e)}"
+
     def is_safe_command(self, command):
         danger_keywords = ["rm -rf /", "mkfs", "dd ", "> /dev/"]
         for kw in danger_keywords:
@@ -174,6 +278,24 @@ class AliceAgent:
         return True, ""
 
     def execute_command(self, command, is_python_code=False):
+        # 拦截内置指令
+        if not is_python_code:
+            cmd_strip = command.strip()
+            if cmd_strip.startswith("toolkit"):
+                return self.handle_toolkit(cmd_strip.split()[1:])
+            if cmd_strip.startswith("memory"):
+                # 极简解析: memory "content" [--ltm]
+                ltm_mode = "--ltm" in cmd_strip
+                content_match = re.search(r'["\'](.*?)["\']', cmd_strip)
+                if content_match:
+                    return self.handle_memory(content_match.group(1), target="ltm" if ltm_mode else "stm")
+                else:
+                    # 如果没带引号，尝试取第一个空格后的全部内容
+                    parts = cmd_strip.split(None, 1)
+                    if len(parts) > 1:
+                        content = parts[1].replace("--ltm", "").strip().strip('"\'')
+                        return self.handle_memory(content, target="ltm" if ltm_mode else "stm")
+
         is_safe, error_msg = self.is_safe_command(command)
         if not is_safe:
             return f"安全性拦截: {error_msg}"
