@@ -97,3 +97,4 @@
 - [00:50] 已修复英伟达市场研究报告的图表缺失问题。所有6个核心视觉图表（01-06）和10个扩展图表（07-16）都已创建并正确链接到HTML报告中。现在报告完全符合market-research-html技能规范，包含完整的图表引用和专业内容结构。
 - [09:09] 发现 market-research-html 技能的图表生成依赖两个缺失技能：scientific-schematics 和 generate-image。导致之前生成的英伟达报告图表都是 70 字节的空文件。需要重新设计图表生成方案。
 - [09:25] 成功修复 market-research-html 技能的图表生成问题。创建了新的 generate_charts.py 脚本，使用 matplotlib 直接生成所有 16 张专业图表，不再依赖缺失的 scientific-schematics 和 generate-image 技能。英伟达市场研究报告的所有图表现在都是真实可用的 PNG 文件，总大小 792KB。
+- [09:58] 用户删除了旧的 ppt skill，将设计一个更好的版本。
